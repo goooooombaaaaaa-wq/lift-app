@@ -52,26 +52,10 @@ body{font-family:'Instrument Sans',sans-serif;background:var(--bg);color:var(--t
 .sec-label{font-family:'Instrument Sans',sans-serif;font-weight:800;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--push);margin:20px 0 10px;}
 
 /* WEEK STRIP */
-.week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-bottom:4px;}
-.wday{background:var(--s1);border:1px solid var(--border);border-radius:10px;padding:9px 3px;text-align:center;cursor:pointer;}
-.wday.today{border-color:var(--push);border-width:2px;}
-.wday-name{font-size:9px;font-weight:600;color:var(--muted);letter-spacing:1px;text-transform:uppercase;}
-.wday-dot{width:6px;height:6px;border-radius:50%;margin:5px auto 4px;background:var(--border);}
-.wday-dot.push{background:var(--push);box-shadow:0 0 6px var(--push);}
-.wday-dot.pull{background:var(--pull);box-shadow:none;}
-.wday-dot.legs{background:var(--legs);box-shadow:none;}
-.wday-dot.core{background:var(--core);box-shadow:none;}
-.wday-type{font-size:8px;color:var(--muted);font-weight:500;}
+/* week calendar styles removed - now using inline styles in renderCalendar */
 
 /* TODAY HERO */
-.hero{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:20px;margin-bottom:6px;box-shadow:0 2px 12px rgba(0,0,0,0.06);}
-.hero-tag{font-size:10px;font-weight:600;letter-spacing:0.5px;color:var(--muted);text-transform:uppercase;margin-bottom:6px;}
-.hero-title{font-family:'Instrument Sans',sans-serif;font-weight:800;font-size:46px;letter-spacing:0.5px;line-height:1;margin-bottom:4px;}
-.hero-sub{font-size:13px;color:var(--muted);margin-bottom:18px;}
-.hero-stats{display:flex;gap:8px;margin-bottom:18px;}
-.hstat{flex:1;background:var(--s2);border-radius:10px;padding:10px 8px;text-align:center;}
-.hstat-val{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:600;}
-.hstat-lbl{font-size:9px;color:var(--muted);font-weight:600;letter-spacing:1px;text-transform:uppercase;}
+
 
 /* BUTTONS */
 .btn{width:100%;padding:15px;border-radius:var(--r);border:none;font-family:'Instrument Sans',sans-serif;font-size:19px;letter-spacing:0.5px;cursor:pointer;transition:opacity .15s,transform .1s;}
@@ -211,10 +195,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5);}
 
 <!-- HOME -->
 <div class="page active" id="page-home">
-  <div class="sec-label" style="margin-top:14px;">THIS WEEK</div>
-  <div class="week" id="week-strip"></div>
-  <div class="sec-label">TODAY</div>
-  <div id="today-hero"></div>
+  <div id="calendar-view"></div>
 </div>
 
 <!-- HISTORY PAGE -->
@@ -358,7 +339,7 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5);}
 
 <!-- BOTTOM NAV -->
 <div class="botbar">
-  <div class="bni active" onclick="showPage('home',this)"><div class="bni-icon">🏠</div><div>Home</div></div>
+  <div class="bni active" onclick="showPage('home',this)"><div class="bni-icon">📅</div><div>Week</div></div>
   <div class="bni" onclick="showPage('history',this)"><div class="bni-icon">📋</div><div>Logs</div></div>
   <div class="bni" onclick="showPage('progress',this)"><div class="bni-icon">📈</div><div>Progress</div></div>
   <div class="bni" onclick="showPage('exercises',this)"><div class="bni-icon">💪</div><div>Exercises</div></div>
@@ -498,48 +479,69 @@ function renderHome(){
   const now = new Date();
   document.getElementById('topbar-date').textContent =
     now.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+  renderCalendar();
+}
 
-  // Week strip
-  const strip=document.getElementById('week-strip');
-  strip.innerHTML='';
-  const dnames=['S','M','T','W','T','F','S'];
-  const tod=now.getDay();
-  for(let i=0;i<7;i++){
-    const s=SCHEDULE[i];
-    const div=document.createElement('div');
-    div.className='wday'+(i===tod?' today':'');
-    div.innerHTML=`<div class="wday-name">${dnames[i]}</div>
-      <div class="wday-dot ${s.type==='rest'?'':s.cls}"></div>
-      <div class="wday-type">${s.type==='rest'?'–':s.type.toUpperCase()}</div>`;
-    strip.appendChild(div);
-  }
+function renderCalendar(){
+  const container = document.getElementById('calendar-view');
+  const now = new Date();
+  const tod = now.getDay();
+  const dnames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const dshort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-  // Hero
-  const sched=SCHEDULE[tod];
-  const hero=document.getElementById('today-hero');
-  if(sched.type==='rest'){
-    hero.innerHTML=`<div class="hero">
-      <div class="hero-tag">TODAY</div>
-      <div class="hero-title" style="color:var(--muted)">REST DAY</div>
-      <div class="hero-sub">Recovery is part of the plan 💤</div>
-    </div>`;
-    return;
-  }
-  const w=WORKOUTS[sched.type];
-  const lastDate=getLastDate(sched.type);
-  const prCount=w.exercises.filter(ex=>prs[ex.id]).length;
-  const sessCount=getSessionCount(sched.type);
-  hero.innerHTML=`<div class="hero">
-    <div class="hero-tag">TODAY</div>
-    <div class="hero-title" style="color:${sched.color}">${sched.label}</div>
-    <div class="hero-sub">${w.exercises.length} exercises · ${lastDate?'Last: '+lastDate:'First time!'}</div>
-    <div class="hero-stats">
-      <div class="hstat"><div class="hstat-val" style="color:${sched.color}">${w.exercises.length}</div><div class="hstat-lbl">Exercises</div></div>
-      <div class="hstat"><div class="hstat-val" style="color:${sched.color}">${prCount}</div><div class="hstat-lbl">PRs Set</div></div>
-      <div class="hstat"><div class="hstat-val" style="color:${sched.color}">${sessCount}</div><div class="hstat-lbl">Sessions</div></div>
-    </div>
-    <button class="btn ${w.btnCls}" onclick="openWorkout('${sched.type}')">START WORKOUT →</button>
+  // Build date for each day of this week (Mon-Sun display starting from current week)
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - tod); // go to Sunday
+  
+  let html = `<div style="padding:16px 16px 0;">
+    <div style="font-family:'Instrument Sans',sans-serif;font-weight:800;font-size:13px;letter-spacing:2px;text-transform:uppercase;color:var(--push);margin-bottom:14px;">THIS WEEK</div>
   </div>`;
+
+  for(let i=0; i<7; i++){
+    const dayDate = new Date(weekStart);
+    dayDate.setDate(weekStart.getDate() + i);
+    const dayNum = dayDate.getDay();
+    const s = SCHEDULE[dayNum];
+    const isToday = i === tod;
+    const dateLabel = dayDate.getDate();
+    const isRest = s.type === 'rest';
+
+    if(isRest){
+      html += `<div style="display:flex;align-items:center;padding:10px 16px;margin:0 16px 8px;background:var(--s1);border:1px solid var(--border);border-radius:12px;gap:14px;opacity:0.45;">
+        <div style="width:42px;text-align:center;flex-shrink:0;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:var(--muted);text-transform:uppercase;">${dshort[dayNum]}</div>
+          <div style="font-size:22px;font-weight:800;color:var(--muted);line-height:1.1;">${dateLabel}</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--muted);">Rest Day</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Recovery</div>
+        </div>
+        ${isToday ? '<div style="font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px;background:var(--border);color:var(--muted);">TODAY</div>' : ''}
+      </div>`;
+    } else {
+      const w = WORKOUTS[s.type];
+      const lastDate = getLastDate(s.type);
+      const sessCount = getSessionCount(s.type);
+      const color = s.color;
+      html += `<div onclick="openWorkout('${s.type}')" style="display:flex;align-items:center;padding:14px 16px;margin:0 16px 8px;background:var(--s1);border:2px solid ${isToday ? color : 'var(--border)'};border-radius:12px;gap:14px;cursor:pointer;transition:border-color .15s;">
+        <div style="width:42px;text-align:center;flex-shrink:0;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;color:${color};text-transform:uppercase;">${dshort[dayNum]}</div>
+          <div style="font-size:22px;font-weight:800;color:${color};line-height:1.1;">${dateLabel}</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:${color};letter-spacing:.5px;">${s.label}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px;">${w.exercises.length} exercises · ${lastDate ? 'Last: '+lastDate : 'Not done yet'}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+          ${isToday ? `<div style="font-size:10px;font-weight:700;letter-spacing:1px;padding:3px 8px;border-radius:20px;background:${color};color:#fff;">TODAY</div>` : ''}
+          <div style="font-size:11px;color:var(--muted);">${sessCount} sessions</div>
+        </div>
+      </div>`;
+    }
+  }
+
+  html += '<div style="height:80px;"></div>'; // bottom padding for nav bar
+  container.innerHTML = html;
 }
 
 function getLastDate(type){

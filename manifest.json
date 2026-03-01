@@ -1,0 +1,10 @@
+{
+  "name": "Goomba Lifts",
+  "short_name": "GoombaLifts",
+  "start_url": "/lift-app/",
+  "scope": "/lift-app/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "orientation": "portrait"
+}

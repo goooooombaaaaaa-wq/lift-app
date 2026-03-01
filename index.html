@@ -285,9 +285,43 @@ input[type=date]::-webkit-calendar-picker-indicator{filter:invert(.5);}
       <button class="close-x" onclick="closeWorkout()">✕</button>
     </div>
     <div id="session-exercises"></div>
+    <div style="padding:12px 16px 4px;">
+      <button class="add-set-btn" style="width:100%;padding:12px;font-size:13px;" onclick="openAddExercise()">+ Add Exercise</button>
+    </div>
   </div>
   <div class="finish-bar">
     <button class="btn" id="finish-btn" onclick="finishWorkout()">FINISH WORKOUT</button>
+  </div>
+</div>
+
+<!-- ADD EXERCISE OVERLAY -->
+<div class="overlay" id="addex-overlay">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mhead-info">
+        <div class="mhead-sub">ADD EXERCISE</div>
+        <div class="mhead-title" id="addex-title"></div>
+      </div>
+      <button class="close-x" onclick="closeAddExercise()">✕</button>
+    </div>
+    <div style="padding:16px;">
+      <div class="form-row">
+        <div class="form-label">Exercise Name</div>
+        <input type="text" id="addex-name" class="form-input" placeholder="e.g. Incline DB Press"/>
+      </div>
+      <div class="form-row">
+        <div class="form-label">Sets × Reps</div>
+        <input type="text" id="addex-sets" class="form-input" placeholder="e.g. 4×10-12"/>
+      </div>
+      <div class="form-row">
+        <div class="form-label">Starting Weight (kg)</div>
+        <input type="number" id="addex-weight" class="form-input" placeholder="e.g. 10" step="0.5" min="0"/>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:16px;">
+        <button class="btn btn-ghost" style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.5px;padding:11px;" onclick="confirmAddExercise()">Add Exercise</button>
+        <button class="btn" style="background:rgba(255,255,255,.05);color:var(--muted);font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600;letter-spacing:.5px;padding:11px 18px;flex:0 0 auto;width:auto;" onclick="closeAddExercise()">Cancel</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -531,6 +565,7 @@ function getSessionCount(type){
 function openWorkout(type){
   activeType=type;
   sessionState={};
+  sessionExercises=[];
   const w=WORKOUTS[type];
   document.getElementById('mhead-sub').textContent=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
   const mt=document.getElementById('mhead-title');
@@ -552,6 +587,7 @@ function openWorkout(type){
         <div class="ex-chk" id="echk-${ex.id}"></div>
         <div class="ex-title">${ex.name}</div>
         <div class="ex-badge">${ex.sets}<br><span style="color:${w.color};font-weight:600;">${pr?pr.kg+' kg PR':'—'}</span></div>
+        <button class="icon-btn del" style="margin-left:4px;flex-shrink:0;" onclick="event.stopPropagation();removeExerciseFromSession('${ex.id}')" title="Remove exercise">✕</button>
       </div>
       <div class="exbody" id="ebody-${ex.id}">
         ${pr?`<div class="pr-badge">🏆 Current PR: ${pr.kg} kg · ${fmtShort(pr.date)}</div>`:''}
@@ -656,6 +692,61 @@ function rebuildPR(exId){
   else delete prs[exId];
 }
 
+
+// Track session-specific added exercises
+let sessionExercises = [];
+
+function openAddExercise(){
+  const w=WORKOUTS[activeType];
+  document.getElementById('addex-title').textContent=w.name+' DAY';
+  document.getElementById('addex-name').value='';
+  document.getElementById('addex-sets').value='';
+  document.getElementById('addex-weight').value='';
+  document.getElementById('addex-overlay').classList.add('open');
+}
+
+function closeAddExercise(){
+  document.getElementById('addex-overlay').classList.remove('open');
+}
+
+function confirmAddExercise(){
+  const name=document.getElementById('addex-name').value.trim();
+  if(!name){document.getElementById('addex-name').focus();return;}
+  const sets=document.getElementById('addex-sets').value.trim()||'—';
+  const wt=parseFloat(document.getElementById('addex-weight').value)||null;
+  const id='custom_'+Date.now();
+  const ex={id,name,sets,defW:wt,custom:true};
+  sessionExercises.push(ex);
+  sessionState[id]={sets:[{kg:wt||'',reps:''},{kg:wt||'',reps:''}],done:false};
+  const w=WORKOUTS[activeType];
+  const container=document.getElementById('session-exercises');
+  const card=document.createElement('div');
+  card.className='excard'; card.id='ecard-'+id;
+  card.innerHTML=`
+    <div class="excard-head" onclick="toggleExCard('${id}')">
+      <div class="ex-chk" id="echk-${id}"></div>
+      <div class="ex-title">${name}</div>
+      <div class="ex-badge">${sets}<br><span style="color:${w.color};font-weight:600;">—</span></div>
+      <button class="icon-btn del" style="margin-left:4px;flex-shrink:0;" onclick="event.stopPropagation();removeExerciseFromSession('${id}')" title="Remove exercise">✕</button>
+    </div>
+    <div class="exbody open" id="ebody-${id}">
+      <div class="sets-header"><span>SET</span><span>WEIGHT (kg)</span><span>REPS</span><span></span></div>
+      <div id="setscontainer-${id}"></div>
+      <button class="add-set-btn" onclick="addSessionSet('${id}')">+ Add Set</button>
+      <button class="mark-done-btn" id="mdone-${id}" onclick="markDone('${id}')">✓ Mark as Done</button>
+    </div>`;
+  container.appendChild(card);
+  renderSessionSets(id);
+  closeAddExercise();
+}
+
+function removeExerciseFromSession(exId){
+  const card=document.getElementById('ecard-'+exId);
+  if(card) card.remove();
+  delete sessionState[exId];
+  sessionExercises=sessionExercises.filter(e=>e.id!==exId);
+}
+
 function closeWorkout(){
   document.getElementById('workout-overlay').classList.remove('open');
   document.body.style.overflow='';
@@ -666,7 +757,7 @@ function finishWorkout(){
   const w=WORKOUTS[activeType];
   const doneCount=Object.values(sessionState).filter(s=>s.done).length;
   closeWorkout();
-  toast(`✅ ${doneCount}/${w.exercises.length} exercises logged!`,3000);
+  toast(`✅ ${doneCount}/${w.exercises.length+sessionExercises.length} exercises logged!`,3000);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1032,14 +1123,8 @@ function renderExerciseCharts(){
       list.appendChild(card);
     });
   });
-async function installApp(){
-  const prompt = window._installPrompt;
-  if(!prompt) return;
-  prompt.prompt();
-  const { outcome } = await prompt.userChoice;
-  document.getElementById('install-banner')?.remove();
-  if(outcome === 'accepted') toast('🎉 LIFT installed!');
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════
 // EXERCISES PAGE
@@ -1059,12 +1144,11 @@ function renderExercises(){
       return `<div style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px;">
         <div style="flex:1;">
           <div style="font-size:13px;font-weight:500;">${ex.name}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${ex.sets}${lastWeight?` · last: ${lastWeight} kg`:''}</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">${ex.sets}${lastWeight ? ' · last: '+lastWeight+' kg' : ''}</div>
         </div>
-        ${pr?`<div style="font-size:11px;color:${color};font-weight:600;text-align:right;">🏆 ${pr.kg} kg</div>`:''}
+        ${pr ? `<div style="font-size:11px;color:${color};font-weight:600;text-align:right;">🏆 ${pr.kg} kg</div>` : ''}
       </div>`;
     }).join('');
-
     return `<div style="margin-bottom:16px;">
       <div class="sec-label" style="color:${color};margin-top:16px;">${typeLabels[type]}</div>
       <div style="font-size:11px;color:var(--muted);margin:-8px 0 10px;letter-spacing:.5px;">${typeSubs[type]}</div>
@@ -1075,12 +1159,67 @@ function renderExercises(){
   }).join('');
 }
 
+
+async function installApp(){
+  const prompt = window._installPrompt;
+  if(!prompt) return;
+  prompt.prompt();
+  const { outcome } = await prompt.userChoice;
+  document.getElementById('install-banner')?.remove();
+  if(outcome === 'accepted') toast('🎉 LIFT installed!');
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════════════════════
 renderHome();
 document.getElementById('past-date').value=today();
 renderPastExercises();
+function registerPWA(){
+  if(!('serviceWorker' in navigator)) return;
+  // Inline service worker as blob URL since we're a single HTML file
+  const swCode = `
+    const CACHE = 'goomba-lifts-v1';
+    const ASSETS = [self.location.href];
+    self.addEventListener('install', e => {
+      e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
+      self.skipWaiting();
+    });
+    self.addEventListener('activate', e => {
+      e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));
+      self.clients.claim();
+    });
+    self.addEventListener('fetch', e => {
+      e.respondWith(caches.match(e.request).then(r => r || fetch(e.request).catch(() => caches.match(e.request))));
+    });`;
+  const blob = new Blob([swCode], {type:'application/javascript'});
+  const swUrl = URL.createObjectURL(blob);
+  navigator.serviceWorker.register(swUrl).catch(()=>{});
+
+  // Show install prompt if available
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    window._installPrompt = e;
+    showInstallBanner();
+  });
+}
+
+function showInstallBanner(){
+  const banner = document.createElement('div');
+  banner.id = 'install-banner';
+  banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:468px;background:var(--s2);border:1px solid var(--border);border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;z-index:400;gap:10px;';
+  banner.innerHTML = `
+    <div>
+      <div style="font-weight:600;font-size:13px;">Install LIFT as an app</div>
+      <div style="font-size:11px;color:var(--muted);">Add to home screen for the best experience</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-shrink:0;">
+      <button onclick="installApp()" style="background:var(--push);border:none;color:#fff;font-family:'Instrument Sans',sans-serif;letter-spacing:1px;font-size:14px;padding:7px 14px;border-radius:8px;cursor:pointer;">INSTALL</button>
+      <button onclick="this.closest('#install-banner').remove()" style="background:var(--s3);border:none;color:var(--muted);font-size:18px;width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>`;
+  document.body.appendChild(banner);
+}
+
 registerPWA();
 </script>
 </body>

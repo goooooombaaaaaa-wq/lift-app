@@ -411,6 +411,54 @@ Object.entries(WORKOUTS).forEach(([type,w])=>{
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
+// CUSTOM EXERCISES — persisted to localStorage
+// ═══════════════════════════════════════════════════════════════════════════
+function loadCustomExercises(){
+  const saved = JSON.parse(localStorage.getItem('lift_custom_exercises')||'{}');
+  // saved = { push:[{id,name,sets,defW}], pull:[], ... }
+  Object.entries(saved).forEach(([type, exArr])=>{
+    if(!WORKOUTS[type]) return;
+    exArr.forEach(ex=>{
+      if(!WORKOUTS[type].exercises.find(e=>e.id===ex.id)){
+        WORKOUTS[type].exercises.push(ex);
+        ALL_EX[ex.id]=ex;
+        EX_TO_TYPE[ex.id]=type;
+      }
+    });
+  });
+}
+
+function saveCustomExercises(){
+  const custom = {};
+  Object.entries(WORKOUTS).forEach(([type,w])=>{
+    const customs = w.exercises.filter(e=>e.id.startsWith('custom_'));
+    if(customs.length) custom[type]=customs;
+  });
+  localStorage.setItem('lift_custom_exercises', JSON.stringify(custom));
+}
+
+function permanentlyAddExercise(type, name, sets, defW){
+  const id = 'custom_'+Date.now();
+  const ex = {id, name, sets:sets||'—', defW:defW||null};
+  WORKOUTS[type].exercises.push(ex);
+  ALL_EX[id]=ex;
+  EX_TO_TYPE[id]=type;
+  saveCustomExercises();
+  return ex;
+}
+
+function permanentlyRemoveExercise(exId){
+  const type = EX_TO_TYPE[exId];
+  if(!type) return;
+  WORKOUTS[type].exercises = WORKOUTS[type].exercises.filter(e=>e.id!==exId);
+  delete ALL_EX[exId];
+  delete EX_TO_TYPE[exId];
+  saveCustomExercises();
+}
+
+loadCustomExercises();
+
+// ═══════════════════════════════════════════════════════════════════════════
 // STATE  — history[exId] = [{date, sets:[{kg,reps}]}]
 // ═══════════════════════════════════════════════════════════════════════════
 let history = JSON.parse(localStorage.getItem('lift_v2_history')||'{}');
@@ -704,7 +752,10 @@ function openAddExercise(){
   document.getElementById('addex-name').value='';
   document.getElementById('addex-sets').value='';
   document.getElementById('addex-weight').value='';
-  document.getElementById('addex-overlay').classList.add('open');
+  const overlay=document.getElementById('addex-overlay');
+  overlay.dataset.mode='session';
+  overlay.dataset.type=activeType;
+  overlay.classList.add('open');
 }
 
 function closeAddExercise(){
@@ -716,6 +767,19 @@ function confirmAddExercise(){
   if(!name){document.getElementById('addex-name').focus();return;}
   const sets=document.getElementById('addex-sets').value.trim()||'—';
   const wt=parseFloat(document.getElementById('addex-weight').value)||null;
+  const overlay=document.getElementById('addex-overlay');
+  const mode=overlay.dataset.mode||'session';
+
+  if(mode==='permanent'){
+    const type=overlay.dataset.type;
+    permanentlyAddExercise(type, name, sets, wt);
+    closeAddExercise();
+    renderExercises();
+    toast('Exercise added to '+WORKOUTS[type].name+' Day');
+    return;
+  }
+
+  // Session mode
   const id='custom_'+Date.now();
   const ex={id,name,sets,defW:wt,custom:true};
   sessionExercises.push(ex);
@@ -1143,12 +1207,14 @@ function renderExercises(){
       const pr = prs[ex.id];
       const lastEntry = (history[ex.id]||[]).slice(-1)[0];
       const lastWeight = lastEntry ? lastEntry.sets[0]?.kg : null;
+      const isCustom = ex.id.startsWith('custom_');
       return `<div style="display:flex;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px;">
         <div style="flex:1;">
-          <div style="font-size:13px;font-weight:500;">${ex.name}</div>
+          <div style="font-size:13px;font-weight:500;">${ex.name}${isCustom ? ' <span style="font-size:10px;color:var(--muted);font-weight:400;">custom</span>':''}</div>
           <div style="font-size:11px;color:var(--muted);margin-top:2px;">${ex.sets}${lastWeight ? ' · last: '+lastWeight+' kg' : ''}</div>
         </div>
-        ${pr ? `<div style="font-size:11px;color:${color};font-weight:600;text-align:right;">🏆 ${pr.kg} kg</div>` : ''}
+        ${pr ? `<div style="font-size:11px;color:${color};font-weight:600;margin-right:6px;">🏆 ${pr.kg} kg</div>` : ''}
+        <button class="icon-btn del" onclick="event.stopPropagation();confirmRemoveExercise('${ex.id}')" title="Remove exercise" style="flex-shrink:0;">✕</button>
       </div>`;
     }).join('');
     return `<div style="margin-bottom:16px;">
@@ -1157,8 +1223,30 @@ function renderExercises(){
       <div style="background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
         ${exerciseRows}
       </div>
+      <button class="add-set-btn" style="width:100%;margin-top:8px;padding:11px;font-size:13px;" onclick="openPermanentAddExercise('${type}')">+ Add Exercise to ${w.name}</button>
     </div>`;
-  }).join('');
+  }).join('') + '<div style="height:80px;"></div>';
+}
+
+function confirmRemoveExercise(exId){
+  const ex = ALL_EX[exId];
+  if(!ex) return;
+  if(!confirm('Remove "'+ex.name+'" from your workout plan? Your logged history will be kept.')) return;
+  permanentlyRemoveExercise(exId);
+  renderExercises();
+  toast('Exercise removed');
+}
+
+function openPermanentAddExercise(type){
+  const w = WORKOUTS[type];
+  document.getElementById('addex-title').textContent = w.name+' DAY';
+  document.getElementById('addex-name').value='';
+  document.getElementById('addex-sets').value='';
+  document.getElementById('addex-weight').value='';
+  // Store which mode we're in
+  document.getElementById('addex-overlay').dataset.mode = 'permanent';
+  document.getElementById('addex-overlay').dataset.type = type;
+  document.getElementById('addex-overlay').classList.add('open');
 }
 
 

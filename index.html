@@ -1332,5 +1332,25 @@ registerPWA();
       .catch(err => console.log('SW failed:', err));
   }
 </script>
+  <button onclick="exportData()" style="position:fixed;bottom:70px;right:12px;z-index:500;background:#222;color:#fff;border:none;border-radius:12px;padding:10px 16px;font-size:13px;font-family:'Mukta Vaani',sans-serif;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.3);">⬇ Export Data</button>
+
+<script>
+function exportData() {
+  const payload = {
+    history: JSON.parse(localStorage.getItem('lift_v2_history') || '{}'),
+    prs: JSON.parse(localStorage.getItem('lift_v2_prs') || '{}'),
+    customExercises: JSON.parse(localStorage.getItem('lift_custom_exercises') || '{}'),
+    exportedAt: new Date().toISOString(),
+    version: 1,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'goomba-lifts-export.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
 </body>
 </html>
